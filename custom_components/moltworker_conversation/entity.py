@@ -137,8 +137,14 @@ class MoltworkerBaseLLMEntity(Entity):
         }
 
         # Cloudflare Access Service Token headers (required for moltworker deployments)
-        cf_client_id = entry_data.get(CONF_CF_ACCESS_CLIENT_ID, "")
-        cf_client_secret = entry_data.get(CONF_CF_ACCESS_CLIENT_SECRET, "")
+        # Strip accidental header-name prefixes (e.g. "CF-Access-Client-Id: value")
+        cf_client_id = entry_data.get(CONF_CF_ACCESS_CLIENT_ID, "").strip()
+        cf_client_secret = entry_data.get(CONF_CF_ACCESS_CLIENT_SECRET, "").strip()
+        for prefix in ("CF-Access-Client-Id:", "CF-Access-Client-Secret:"):
+            if cf_client_id.startswith(prefix):
+                cf_client_id = cf_client_id[len(prefix) :].strip()
+            if cf_client_secret.startswith(prefix):
+                cf_client_secret = cf_client_secret[len(prefix) :].strip()
         if cf_client_id:
             headers["CF-Access-Client-Id"] = cf_client_id
         if cf_client_secret:

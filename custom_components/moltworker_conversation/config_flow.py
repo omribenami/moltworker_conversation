@@ -99,6 +99,14 @@ DEFAULT_AI_TASK_OPTIONS = types.MappingProxyType(
 )
 
 
+def _strip_cf_header_prefix(value: str) -> str:
+    """Strip accidental header-name prefixes pasted into CF Access fields."""
+    for prefix in ("CF-Access-Client-Id:", "CF-Access-Client-Secret:"):
+        if value.startswith(prefix):
+            return value[len(prefix) :].strip()
+    return value.strip()
+
+
 async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> None:
     """Validate the user input allows us to connect."""
     base_url = data[CONF_OPENCLAW_URL].rstrip("/")
@@ -113,8 +121,10 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> None:
     }
 
     # Include Cloudflare Access Service Token headers if configured
-    cf_client_id = data.get(CONF_CF_ACCESS_CLIENT_ID, "")
-    cf_client_secret = data.get(CONF_CF_ACCESS_CLIENT_SECRET, "")
+    cf_client_id = _strip_cf_header_prefix(data.get(CONF_CF_ACCESS_CLIENT_ID, ""))
+    cf_client_secret = _strip_cf_header_prefix(
+        data.get(CONF_CF_ACCESS_CLIENT_SECRET, "")
+    )
     if cf_client_id:
         headers["CF-Access-Client-Id"] = cf_client_id
     if cf_client_secret:
@@ -171,6 +181,14 @@ class MoltworkerConversationConfigFlow(ConfigFlow, domain=DOMAIN):
             errors["base"] = "unknown"
         else:
             user_input[CONF_OPENCLAW_URL] = user_input[CONF_OPENCLAW_URL].rstrip("/")
+            if CONF_CF_ACCESS_CLIENT_ID in user_input:
+                user_input[CONF_CF_ACCESS_CLIENT_ID] = _strip_cf_header_prefix(
+                    user_input[CONF_CF_ACCESS_CLIENT_ID]
+                )
+            if CONF_CF_ACCESS_CLIENT_SECRET in user_input:
+                user_input[CONF_CF_ACCESS_CLIENT_SECRET] = _strip_cf_header_prefix(
+                    user_input[CONF_CF_ACCESS_CLIENT_SECRET]
+                )
             return self.async_create_entry(
                 title=user_input.get(CONF_NAME, DEFAULT_NAME),
                 data=user_input,
