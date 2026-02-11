@@ -51,20 +51,32 @@ async def async_setup_entry(hass: HomeAssistant, entry: MoltworkerConfigEntry) -
     }
 
     # Include Cloudflare Access Service Token headers if configured
-    cf_client_id = entry.data.get(CONF_CF_ACCESS_CLIENT_ID, "")
-    cf_client_secret = entry.data.get(CONF_CF_ACCESS_CLIENT_SECRET, "")
+    # Strip accidental header-name prefixes (e.g. "CF-Access-Client-Id: value")
+    cf_client_id = entry.data.get(CONF_CF_ACCESS_CLIENT_ID, "").strip()
+    cf_client_secret = entry.data.get(CONF_CF_ACCESS_CLIENT_SECRET, "").strip()
+    for prefix in ("CF-Access-Client-Id:", "CF-Access-Client-Secret:"):
+        if cf_client_id.startswith(prefix):
+            cf_client_id = cf_client_id[len(prefix) :].strip()
+        if cf_client_secret.startswith(prefix):
+            cf_client_secret = cf_client_secret[len(prefix) :].strip()
     if cf_client_id:
         headers["CF-Access-Client-Id"] = cf_client_id
     if cf_client_secret:
         headers["CF-Access-Client-Secret"] = cf_client_secret
 
     try:
-        response = await client.get(
-            f"{base_url}/v1/models",
+        # Validate connectivity and auth by POSTing to chat completions endpoint
+        # OpenClaw doesn't implement /v1/models, so we send a minimal request
+        # A 401 means bad auth; connection/timeout means unreachable;
+        # any other response (including 400 for bad payload) means success
+        response = await client.post(
+            f"{base_url}/v1/chat/completions",
             headers=headers,
+            json={"model": "openclaw", "messages": []},
             timeout=10.0,
         )
-        response.raise_for_status()
+        if response.status_code == 401:
+            response.raise_for_status()
     except httpx.HTTPStatusError as err:
         if err.response.status_code == 401:
             _LOGGER.error("Invalid credentials for Moltworker")
