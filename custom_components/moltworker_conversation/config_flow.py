@@ -1,4 +1,4 @@
-"""Config flow for OpenClaw Conversation integration."""
+"""Config flow for Moltworker Conversation integration."""
 
 from __future__ import annotations
 
@@ -38,6 +38,8 @@ from homeassistant.helpers.selector import (
 
 from .const import (
     CONF_AGENT_ID,
+    CONF_CF_ACCESS_CLIENT_ID,
+    CONF_CF_ACCESS_CLIENT_SECRET,
     CONF_CONTEXT_THRESHOLD,
     CONF_CONTEXT_TRUNCATE_STRATEGY,
     CONF_HA_MCP_URL,
@@ -70,6 +72,12 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
             TextSelectorConfig(type=TextSelectorType.PASSWORD)
         ),
         vol.Optional(CONF_VERIFY_SSL, default=DEFAULT_VERIFY_SSL): BooleanSelector(),
+        vol.Optional(CONF_CF_ACCESS_CLIENT_ID, default=""): TextSelector(
+            TextSelectorConfig(type=TextSelectorType.TEXT)
+        ),
+        vol.Optional(CONF_CF_ACCESS_CLIENT_SECRET, default=""): TextSelector(
+            TextSelectorConfig(type=TextSelectorType.PASSWORD)
+        ),
     }
 )
 
@@ -92,28 +100,31 @@ DEFAULT_AI_TASK_OPTIONS = types.MappingProxyType(
 
 
 async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> None:
-    """Validate the user input allows us to connect.
-
-    Data has the keys from STEP_USER_DATA_SCHEMA with values provided by the user.
-    """
+    """Validate the user input allows us to connect."""
     base_url = data[CONF_OPENCLAW_URL].rstrip("/")
     api_key = data[CONF_API_KEY]
     verify_ssl = data.get(CONF_VERIFY_SSL, DEFAULT_VERIFY_SSL)
 
-    # Use Home Assistant's httpx client helper to avoid blocking I/O during SSL setup
     client = get_async_client(hass, verify_ssl=verify_ssl)
 
-    # Validate connectivity and auth by POSTing to the chat completions endpoint.
-    # OpenClaw's gateway doesn't implement /v1/models, so we send a minimal
-    # request to the endpoint the integration actually uses at runtime.
+    headers: dict[str, str] = {
+        "Authorization": f"Bearer {api_key}",
+        "x-openclaw-agent-id": DEFAULT_AGENT_ID,
+    }
+
+    # Include Cloudflare Access Service Token headers if configured
+    cf_client_id = data.get(CONF_CF_ACCESS_CLIENT_ID, "")
+    cf_client_secret = data.get(CONF_CF_ACCESS_CLIENT_SECRET, "")
+    if cf_client_id:
+        headers["CF-Access-Client-Id"] = cf_client_id
+    if cf_client_secret:
+        headers["CF-Access-Client-Secret"] = cf_client_secret
+
     # A 401 means bad auth; a connection/timeout error means unreachable;
     # any other response (including 400 for bad payload) means success.
     response = await client.post(
         f"{base_url}/v1/chat/completions",
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "x-openclaw-agent-id": DEFAULT_AGENT_ID,
-        },
+        headers=headers,
         json={"model": "openclaw", "messages": []},
         timeout=10.0,
     )
@@ -121,8 +132,8 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> None:
         response.raise_for_status()
 
 
-class OpenClawConversationConfigFlow(ConfigFlow, domain=DOMAIN):
-    """Handle a config flow for OpenClaw Conversation."""
+class MoltworkerConversationConfigFlow(ConfigFlow, domain=DOMAIN):
+    """Handle a config flow for Moltworker Conversation."""
 
     VERSION = 1
 
@@ -130,7 +141,7 @@ class OpenClawConversationConfigFlow(ConfigFlow, domain=DOMAIN):
     @callback
     def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
         """Create the options flow."""
-        return OpenClawOptionsFlowHandler()
+        return MoltworkerOptionsFlowHandler()
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -159,10 +170,7 @@ class OpenClawConversationConfigFlow(ConfigFlow, domain=DOMAIN):
             _LOGGER.exception("Unexpected exception")
             errors["base"] = "unknown"
         else:
-            # Normalize the URL by stripping trailing slash
             user_input[CONF_OPENCLAW_URL] = user_input[CONF_OPENCLAW_URL].rstrip("/")
-            # Don't create default subentries - user must add conversation agents
-            # manually so they can provide the required HA MCP URL
             return self.async_create_entry(
                 title=user_input.get(CONF_NAME, DEFAULT_NAME),
                 data=user_input,
@@ -179,13 +187,13 @@ class OpenClawConversationConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> dict[str, type[ConfigSubentryFlow]]:
         """Return subentries supported by this integration."""
         return {
-            "conversation": OpenClawSubentryFlowHandler,
-            "ai_task_data": OpenClawAITaskSubentryFlowHandler,
+            "conversation": MoltworkerSubentryFlowHandler,
+            "ai_task_data": MoltworkerAITaskSubentryFlowHandler,
         }
 
 
-class OpenClawSubentryFlowHandler(ConfigSubentryFlow):
-    """Flow for managing OpenClaw conversation subentries."""
+class MoltworkerSubentryFlowHandler(ConfigSubentryFlow):
+    """Flow for managing Moltworker conversation subentries."""
 
     options: dict[str, Any]
 
@@ -212,7 +220,6 @@ class OpenClawSubentryFlowHandler(ConfigSubentryFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
         """Manage the options."""
-        # Abort if entry is not loaded
         if self._get_entry().state != ConfigEntryState.LOADED:
             return self.async_abort(reason="entry_not_loaded")
 
@@ -231,7 +238,7 @@ class OpenClawSubentryFlowHandler(ConfigSubentryFlow):
                 data=user_input,
             )
 
-        schema = self.openclaw_config_option_schema(self.options)
+        schema = self._config_option_schema(self.options)
 
         if self._is_new:
             schema = {
@@ -246,8 +253,8 @@ class OpenClawSubentryFlowHandler(ConfigSubentryFlow):
             ),
         )
 
-    def openclaw_config_option_schema(self, options: dict[str, Any]) -> dict:
-        """Return a schema for OpenClaw conversation options."""
+    def _config_option_schema(self, options: dict[str, Any]) -> dict:
+        """Return a schema for Moltworker conversation options."""
         return {
             vol.Required(CONF_HA_MCP_URL): TextSelector(
                 TextSelectorConfig(type=TextSelectorType.URL)
@@ -287,8 +294,8 @@ class OpenClawSubentryFlowHandler(ConfigSubentryFlow):
         }
 
 
-class OpenClawAITaskSubentryFlowHandler(ConfigSubentryFlow):
-    """Flow for managing OpenClaw AI Task subentries."""
+class MoltworkerAITaskSubentryFlowHandler(ConfigSubentryFlow):
+    """Flow for managing Moltworker AI Task subentries."""
 
     options: dict[str, Any]
 
@@ -315,7 +322,6 @@ class OpenClawAITaskSubentryFlowHandler(ConfigSubentryFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
         """Manage the options."""
-        # Abort if entry is not loaded
         if self._get_entry().state != ConfigEntryState.LOADED:
             return self.async_abort(reason="entry_not_loaded")
 
@@ -360,8 +366,8 @@ class OpenClawAITaskSubentryFlowHandler(ConfigSubentryFlow):
         )
 
 
-class OpenClawOptionsFlowHandler(OptionsFlow):
-    """Handle OpenClaw Conversation options."""
+class MoltworkerOptionsFlowHandler(OptionsFlow):
+    """Handle Moltworker Conversation options."""
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -370,7 +376,6 @@ class OpenClawOptionsFlowHandler(OptionsFlow):
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            # Validate connectivity with new settings
             test_data = {
                 CONF_OPENCLAW_URL: user_input.get(
                     CONF_OPENCLAW_URL, self.config_entry.data[CONF_OPENCLAW_URL]
@@ -381,6 +386,14 @@ class OpenClawOptionsFlowHandler(OptionsFlow):
                 CONF_VERIFY_SSL: user_input.get(
                     CONF_VERIFY_SSL,
                     self.config_entry.data.get(CONF_VERIFY_SSL, DEFAULT_VERIFY_SSL),
+                ),
+                CONF_CF_ACCESS_CLIENT_ID: user_input.get(
+                    CONF_CF_ACCESS_CLIENT_ID,
+                    self.config_entry.data.get(CONF_CF_ACCESS_CLIENT_ID, ""),
+                ),
+                CONF_CF_ACCESS_CLIENT_SECRET: user_input.get(
+                    CONF_CF_ACCESS_CLIENT_SECRET,
+                    self.config_entry.data.get(CONF_CF_ACCESS_CLIENT_SECRET, ""),
                 ),
             }
 
@@ -400,7 +413,6 @@ class OpenClawOptionsFlowHandler(OptionsFlow):
                 _LOGGER.exception("Unexpected exception")
                 errors["base"] = "unknown"
             else:
-                # Normalize URL and update config entry data
                 user_input[CONF_OPENCLAW_URL] = user_input[CONF_OPENCLAW_URL].rstrip(
                     "/"
                 )
@@ -410,7 +422,6 @@ class OpenClawOptionsFlowHandler(OptionsFlow):
                 )
                 return self.async_create_entry(data={})
 
-        # Build schema with current values as defaults
         current_data = self.config_entry.data
         schema = vol.Schema(
             {
@@ -426,6 +437,14 @@ class OpenClawOptionsFlowHandler(OptionsFlow):
                     CONF_VERIFY_SSL,
                     default=current_data.get(CONF_VERIFY_SSL, DEFAULT_VERIFY_SSL),
                 ): BooleanSelector(),
+                vol.Optional(
+                    CONF_CF_ACCESS_CLIENT_ID,
+                    default=current_data.get(CONF_CF_ACCESS_CLIENT_ID, ""),
+                ): TextSelector(TextSelectorConfig(type=TextSelectorType.TEXT)),
+                vol.Optional(
+                    CONF_CF_ACCESS_CLIENT_SECRET,
+                    default=current_data.get(CONF_CF_ACCESS_CLIENT_SECRET, ""),
+                ): TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD)),
             }
         )
 

@@ -1,4 +1,4 @@
-"""Base entity for OpenClaw Conversation."""
+"""Base entity for Moltworker Conversation."""
 
 from __future__ import annotations
 
@@ -21,6 +21,8 @@ from homeassistant.util import slugify
 
 from .const import (
     CONF_AGENT_ID,
+    CONF_CF_ACCESS_CLIENT_ID,
+    CONF_CF_ACCESS_CLIENT_SECRET,
     CONF_CONTEXT_THRESHOLD,
     CONF_CONTEXT_TRUNCATE_STRATEGY,
     CONF_OPENCLAW_URL,
@@ -35,7 +37,7 @@ from .const import (
 from .exceptions import TokenLengthExceededError
 
 if TYPE_CHECKING:
-    from . import OpenClawConfigEntry
+    from . import MoltworkerConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -101,13 +103,13 @@ def _convert_content_to_param(
     return messages
 
 
-class OpenClawBaseLLMEntity(Entity):
-    """OpenClaw base entity."""
+class MoltworkerBaseLLMEntity(Entity):
+    """Moltworker base entity."""
 
     _attr_has_entity_name = True
     _attr_name = None
 
-    def __init__(self, entry: OpenClawConfigEntry, subentry: ConfigSubentry) -> None:
+    def __init__(self, entry: MoltworkerConfigEntry, subentry: ConfigSubentry) -> None:
         """Initialize the entity."""
         self.entry = entry
         self.subentry = subentry
@@ -115,21 +117,18 @@ class OpenClawBaseLLMEntity(Entity):
         self._attr_device_info = dr.DeviceInfo(
             identifiers={(DOMAIN, subentry.subentry_id)},
             name=subentry.title,
-            manufacturer="OpenClaw",
-            model="OpenClaw Conversation",
+            manufacturer="Moltworker",
+            model="Moltworker Conversation",
             entry_type=dr.DeviceEntryType.SERVICE,
         )
 
     def _get_httpx_client(self) -> httpx.AsyncClient:
-        """Return an httpx client for API requests.
-
-        Uses Home Assistant's helper to avoid blocking I/O during SSL setup.
-        """
+        """Return an httpx client for API requests."""
         verify_ssl = self.entry.data.get(CONF_VERIFY_SSL, DEFAULT_VERIFY_SSL)
         return get_async_client(self.hass, verify_ssl=verify_ssl)
 
     def _get_headers(self) -> dict[str, str]:
-        """Build headers for OpenClaw API requests."""
+        """Build headers for Moltworker API requests."""
         entry_data = self.entry.data
         subentry_data = self.subentry.data
         headers: dict[str, str] = {
@@ -137,7 +136,15 @@ class OpenClawBaseLLMEntity(Entity):
             "Content-Type": "application/json",
         }
 
-        # Add OpenClaw-specific headers (from subentry config)
+        # Cloudflare Access Service Token headers (required for moltworker deployments)
+        cf_client_id = entry_data.get(CONF_CF_ACCESS_CLIENT_ID, "")
+        cf_client_secret = entry_data.get(CONF_CF_ACCESS_CLIENT_SECRET, "")
+        if cf_client_id:
+            headers["CF-Access-Client-Id"] = cf_client_id
+        if cf_client_secret:
+            headers["CF-Access-Client-Secret"] = cf_client_secret
+
+        # OpenClaw-specific headers (from subentry config)
         session_key = subentry_data.get(CONF_SESSION_KEY, "")
         if session_key:
             headers["x-openclaw-session-key"] = session_key
@@ -149,7 +156,7 @@ class OpenClawBaseLLMEntity(Entity):
         return headers
 
     def _get_api_url(self) -> str:
-        """Return the OpenClaw chat completions API URL."""
+        """Return the Moltworker chat completions API URL."""
         base_url = self.entry.data[CONF_OPENCLAW_URL].rstrip("/")
         return f"{base_url}/v1/chat/completions"
 
@@ -163,14 +170,12 @@ class OpenClawBaseLLMEntity(Entity):
         """Generate an answer for the chat log with streaming support."""
         messages = _convert_content_to_param(chat_log.content)
 
-        # Build API parameters - OpenClaw handles model selection
         api_kwargs: dict[str, Any] = {
             "model": "openclaw",
-            "user": self.entity_id,  # Send entity_id for session correlation
+            "user": self.entity_id,
             "stream": True,
         }
 
-        # Add structured output format if provided
         if structure is not None:
             api_kwargs["response_format"] = {
                 "type": "json_schema",
@@ -181,18 +186,15 @@ class OpenClawBaseLLMEntity(Entity):
                 },
             }
 
-        # Build request body
         request_body = {
             "messages": messages,
             **api_kwargs,
         }
 
-        # Make streaming request to OpenClaw
         client = self._get_httpx_client()
         api_url = self._get_api_url()
         headers = self._get_headers()
 
-        # Note: We use HA's shared client, so we don't close it
         async with client.stream(
             "POST",
             api_url,
@@ -202,7 +204,6 @@ class OpenClawBaseLLMEntity(Entity):
         ) as response:
             response.raise_for_status()
 
-            # Process stream
             async for _ in chat_log.async_add_delta_content_stream(
                 self.entity_id, self._transform_stream(chat_log, response)
             ):
@@ -218,13 +219,12 @@ class OpenClawBaseLLMEntity(Entity):
         total_tokens = 0
 
         async for line in response.aiter_lines():
-            # Parse SSE format
             line = line.strip()
             if not line:
                 continue
 
             if line.startswith("data: "):
-                data = line[6:]  # Remove "data: " prefix
+                data = line[6:]
 
                 if data == "[DONE]":
                     break
@@ -235,12 +235,10 @@ class OpenClawBaseLLMEntity(Entity):
                     _LOGGER.warning("Failed to parse SSE chunk: %s", data)
                     continue
 
-                # Signal new assistant message on first chunk
                 if first_chunk:
                     yield {"role": "assistant"}
                     first_chunk = False
 
-                # Track usage if available
                 if chunk.get("usage"):
                     usage = chunk["usage"]
                     total_tokens = usage.get("total_tokens", 0)
@@ -260,7 +258,6 @@ class OpenClawBaseLLMEntity(Entity):
                 delta = choice.get("delta", {})
                 finish_reason = choice.get("finish_reason")
 
-                # Yield content delta
                 if delta.get("content"):
                     yield {"content": delta["content"]}
 
@@ -270,7 +267,6 @@ class OpenClawBaseLLMEntity(Entity):
                 if finish_reason == "stop":
                     break
 
-        # Check context threshold after stream completes
         if total_tokens > self.subentry.data.get(
             CONF_CONTEXT_THRESHOLD, DEFAULT_CONTEXT_THRESHOLD
         ):
@@ -284,8 +280,6 @@ class OpenClawBaseLLMEntity(Entity):
         )
 
         if strategy == "clear":
-            # Keep only system prompt and last user message
-            # This is handled by refreshing the LLM data
             _LOGGER.info("Context threshold exceeded, conversation history cleared")
             last_user_message_index = None
             messages = chat_log.content

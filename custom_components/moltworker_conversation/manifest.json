@@ -1,0 +1,20 @@
+{
+  "domain": "moltworker_conversation",
+  "name": "Moltworker Conversation",
+  "codeowners": [
+    "@omribenami"
+  ],
+  "config_flow": true,
+  "dependencies": [
+    "ai_task",
+    "conversation",
+    "history",
+    "recorder"
+  ],
+  "documentation": "https://github.com/omribenami/moltworker_conversation",
+  "integration_type": "service",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/omribenami/moltworker_conversation/issues",
+  "requirements": [],
+  "version": "1.0.0"
+}

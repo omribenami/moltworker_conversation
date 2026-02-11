@@ -1,4 +1,4 @@
-"""OpenClaw Conversation agent entity."""
+"""Moltworker Conversation agent entity."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ from homeassistant.helpers import intent, llm, template
 from homeassistant.helpers.chat_session import async_get_chat_session
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from . import OpenClawConfigEntry
+from . import MoltworkerConfigEntry
 from .const import (
     CONF_HA_MCP_URL,
     CONF_PROMPT,
@@ -29,40 +29,40 @@ from .const import (
     DOMAIN,
     EVENT_CONVERSATION_FINISHED,
 )
-from .entity import OpenClawBaseLLMEntity
+from .entity import MoltworkerBaseLLMEntity
 
 _LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(
     hass,
-    config_entry: OpenClawConfigEntry,
+    config_entry: MoltworkerConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Set up the OpenClaw Conversation entities."""
+    """Set up the Moltworker Conversation entities."""
     for subentry in config_entry.subentries.values():
         if subentry.subentry_type != "conversation":
             continue
 
         async_add_entities(
-            [OpenClawAgentEntity(config_entry, subentry)],
+            [MoltworkerAgentEntity(config_entry, subentry)],
             config_subentry_id=subentry.subentry_id,
         )
 
 
-class OpenClawAgentEntity(
+class MoltworkerAgentEntity(
     ConversationEntity,
     conversation.AbstractConversationAgent,
-    OpenClawBaseLLMEntity,
+    MoltworkerBaseLLMEntity,
 ):
-    """OpenClaw conversation agent."""
+    """Moltworker conversation agent."""
 
     _attr_supports_streaming = True
     _attr_supported_features = ConversationEntityFeature.CONTROL
 
     def __init__(
         self,
-        entry: OpenClawConfigEntry,
+        entry: MoltworkerConfigEntry,
         subentry: ConfigSubentry,
     ) -> None:
         """Initialize the agent."""
@@ -97,16 +97,10 @@ class OpenClawAgentEntity(
         chat_log: ChatLog,
     ) -> ConversationResult:
         """Call the API."""
-        # Create LLM context
         llm_context = user_input.as_llm_context(DOMAIN)
-
-        # Build system prompt
         system_prompt = self._build_system_prompt(llm_context, user_input)
-
-        # Set system prompt in chat log
         chat_log.content[0] = conversation.SystemContent(content=system_prompt)
 
-        # Call the LLM
         try:
             await self._async_handle_chat_log(
                 chat_log,
@@ -123,7 +117,6 @@ class OpenClawAgentEntity(
                 response=intent_response, conversation_id=user_input.conversation_id
             )
 
-        # Fire conversation finished event
         self.hass.bus.async_fire(
             EVENT_CONVERSATION_FINISHED,
             {
@@ -133,10 +126,7 @@ class OpenClawAgentEntity(
             },
         )
 
-        # Build response from chat log
         intent_response = intent.IntentResponse(language=user_input.language)
-
-        # Get last assistant message
         last_content = chat_log.content[-1]
         if isinstance(last_content, conversation.AssistantContent):
             intent_response.async_set_speech(last_content.content or "")

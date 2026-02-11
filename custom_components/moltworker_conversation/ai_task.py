@@ -1,4 +1,4 @@
-"""AI Task integration for OpenClaw Conversation."""
+"""AI Task integration for Moltworker Conversation."""
 
 from __future__ import annotations
 
@@ -13,12 +13,12 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util.json import json_loads
 
-from .entity import OpenClawBaseLLMEntity
+from .entity import MoltworkerBaseLLMEntity
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigSubentry
 
-    from . import OpenClawConfigEntry
+    from . import MoltworkerConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -34,18 +34,18 @@ async def async_setup_entry(
             continue
 
         async_add_entities(
-            [OpenClawTaskEntity(config_entry, subentry)],
+            [MoltworkerTaskEntity(config_entry, subentry)],
             config_subentry_id=subentry.subentry_id,
         )
 
 
-class OpenClawTaskEntity(
+class MoltworkerTaskEntity(
     ai_task.AITaskEntity,
-    OpenClawBaseLLMEntity,
+    MoltworkerBaseLLMEntity,
 ):
-    """OpenClaw AI Task entity."""
+    """Moltworker AI Task entity."""
 
-    def __init__(self, entry: OpenClawConfigEntry, subentry: ConfigSubentry) -> None:
+    def __init__(self, entry: MoltworkerConfigEntry, subentry: ConfigSubentry) -> None:
         """Initialize the entity."""
         super().__init__(entry, subentry)
         self._attr_supported_features = (
@@ -59,7 +59,6 @@ class OpenClawTaskEntity(
         chat_log: conversation.ChatLog,
     ) -> ai_task.GenDataTaskResult:
         """Handle a generate data task."""
-        # Call _async_handle_chat_log
         await self._async_handle_chat_log(
             chat_log,
             llm_context=None,
@@ -67,7 +66,6 @@ class OpenClawTaskEntity(
             structure=task.structure,
         )
 
-        # Extract response
         if not isinstance(chat_log.content[-1], conversation.AssistantContent):
             raise HomeAssistantError(
                 "Last content in chat log is not an AssistantContent"
@@ -75,7 +73,6 @@ class OpenClawTaskEntity(
 
         text = chat_log.content[-1].content or ""
 
-        # Handle structured output
         if not task.structure:
             return ai_task.GenDataTaskResult(
                 conversation_id=chat_log.conversation_id,

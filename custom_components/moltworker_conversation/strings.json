@@ -4,14 +4,18 @@
       "user": {
         "data": {
           "name": "[%key:common::config_flow::data::name%]",
-          "openclaw_url": "OpenClaw URL",
+          "openclaw_url": "Moltworker URL",
           "api_key": "[%key:common::config_flow::data::api_key%]",
-          "verify_ssl": "Verify SSL certificate"
+          "verify_ssl": "Verify SSL certificate",
+          "cf_access_client_id": "CF Access Client ID",
+          "cf_access_client_secret": "CF Access Client Secret"
         },
         "data_description": {
-          "openclaw_url": "The base URL of your OpenClaw instance",
-          "api_key": "Your OpenClaw Gateway token",
-          "verify_ssl": "Disable to allow self-signed certificates"
+          "openclaw_url": "The base URL of your Moltworker instance (e.g. https://your-worker.workers.dev)",
+          "api_key": "Your Moltworker gateway token (MOLTBOT_GATEWAY_TOKEN)",
+          "verify_ssl": "Disable to allow self-signed certificates",
+          "cf_access_client_id": "Cloudflare Access Service Token Client ID (required for moltworker deployments)",
+          "cf_access_client_secret": "Cloudflare Access Service Token Client Secret"
         }
       }
     },
@@ -25,14 +29,18 @@
     "step": {
       "init": {
         "data": {
-          "openclaw_url": "[%key:component::openclaw_conversation::config::step::user::data::openclaw_url%]",
+          "openclaw_url": "[%key:component::moltworker_conversation::config::step::user::data::openclaw_url%]",
           "api_key": "[%key:common::config_flow::data::api_key%]",
-          "verify_ssl": "[%key:component::openclaw_conversation::config::step::user::data::verify_ssl%]"
+          "verify_ssl": "[%key:component::moltworker_conversation::config::step::user::data::verify_ssl%]",
+          "cf_access_client_id": "[%key:component::moltworker_conversation::config::step::user::data::cf_access_client_id%]",
+          "cf_access_client_secret": "[%key:component::moltworker_conversation::config::step::user::data::cf_access_client_secret%]"
         },
         "data_description": {
-          "openclaw_url": "[%key:component::openclaw_conversation::config::step::user::data_description::openclaw_url%]",
-          "api_key": "[%key:component::openclaw_conversation::config::step::user::data_description::api_key%]",
-          "verify_ssl": "[%key:component::openclaw_conversation::config::step::user::data_description::verify_ssl%]"
+          "openclaw_url": "[%key:component::moltworker_conversation::config::step::user::data_description::openclaw_url%]",
+          "api_key": "[%key:component::moltworker_conversation::config::step::user::data_description::api_key%]",
+          "verify_ssl": "[%key:component::moltworker_conversation::config::step::user::data_description::verify_ssl%]",
+          "cf_access_client_id": "[%key:component::moltworker_conversation::config::step::user::data_description::cf_access_client_id%]",
+          "cf_access_client_secret": "[%key:component::moltworker_conversation::config::step::user::data_description::cf_access_client_secret%]"
         }
       }
     },

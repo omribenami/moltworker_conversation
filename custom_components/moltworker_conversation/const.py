@@ -1,9 +1,9 @@
-"""Constants for the OpenClaw Conversation integration."""
+"""Constants for the Moltworker Conversation integration."""
 
-DOMAIN = "openclaw_conversation"
-DEFAULT_NAME = "OpenClaw Conversation"
-DEFAULT_CONVERSATION_NAME = "OpenClaw Conversation"
-DEFAULT_AI_TASK_NAME = "OpenClaw AI Task"
+DOMAIN = "moltworker_conversation"
+DEFAULT_NAME = "Moltworker Conversation"
+DEFAULT_CONVERSATION_NAME = "Moltworker Conversation"
+DEFAULT_AI_TASK_NAME = "Moltworker AI Task"
 
 # Config flow fields
 CONF_OPENCLAW_URL = "openclaw_url"
@@ -12,13 +12,17 @@ CONF_SESSION_KEY = "session_key"
 CONF_AGENT_ID = "agent_id"
 CONF_VERIFY_SSL = "verify_ssl"
 
+# Cloudflare Access Service Token (for moltworker deployments behind CF Access)
+CONF_CF_ACCESS_CLIENT_ID = "cf_access_client_id"
+CONF_CF_ACCESS_CLIENT_SECRET = "cf_access_client_secret"
+
 # Defaults
 DEFAULT_AGENT_ID = "main"
 DEFAULT_SESSION_KEY = ""
 DEFAULT_VERIFY_SSL = True
 
 # Events
-EVENT_CONVERSATION_FINISHED = "openclaw_conversation.conversation.finished"
+EVENT_CONVERSATION_FINISHED = "moltworker_conversation.conversation.finished"
 
 # Prompt configuration
 CONF_PROMPT = "prompt"

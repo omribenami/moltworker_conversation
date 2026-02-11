@@ -9,14 +9,18 @@
             "user": {
                 "data": {
                     "name": "Name",
-                    "openclaw_url": "OpenClaw URL",
+                    "openclaw_url": "Moltworker URL",
                     "api_key": "Gateway Token",
-                    "verify_ssl": "Verify SSL certificate"
+                    "verify_ssl": "Verify SSL certificate",
+                    "cf_access_client_id": "CF Access Client ID",
+                    "cf_access_client_secret": "CF Access Client Secret"
                 },
                 "data_description": {
-                    "openclaw_url": "The base URL of your OpenClaw instance",
-                    "api_key": "Your OpenClaw Gateway token",
-                    "verify_ssl": "Disable to allow self-signed certificates"
+                    "openclaw_url": "The base URL of your Moltworker instance (e.g. https://your-worker.workers.dev)",
+                    "api_key": "Your Moltworker gateway token (MOLTBOT_GATEWAY_TOKEN)",
+                    "verify_ssl": "Disable to allow self-signed certificates",
+                    "cf_access_client_id": "Cloudflare Access Service Token Client ID (required for moltworker deployments)",
+                    "cf_access_client_secret": "Cloudflare Access Service Token Client Secret"
                 }
             }
         }
@@ -30,14 +34,18 @@
         "step": {
             "init": {
                 "data": {
-                    "openclaw_url": "OpenClaw URL",
+                    "openclaw_url": "Moltworker URL",
                     "api_key": "Gateway Token",
-                    "verify_ssl": "Verify SSL certificate"
+                    "verify_ssl": "Verify SSL certificate",
+                    "cf_access_client_id": "CF Access Client ID",
+                    "cf_access_client_secret": "CF Access Client Secret"
                 },
                 "data_description": {
-                    "openclaw_url": "The base URL of your OpenClaw instance",
-                    "api_key": "Your OpenClaw Gateway token",
-                    "verify_ssl": "Disable to allow self-signed certificates"
+                    "openclaw_url": "The base URL of your Moltworker instance (e.g. https://your-worker.workers.dev)",
+                    "api_key": "Your Moltworker gateway token (MOLTBOT_GATEWAY_TOKEN)",
+                    "verify_ssl": "Disable to allow self-signed certificates",
+                    "cf_access_client_id": "Cloudflare Access Service Token Client ID (required for moltworker deployments)",
+                    "cf_access_client_secret": "Cloudflare Access Service Token Client Secret"
                 }
             }
         }
